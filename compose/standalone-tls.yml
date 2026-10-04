@@ -1,0 +1,6 @@
+# PROXY_MODE=standalone with TLS_CERT/TLS_KEY: nginx serves HTTPS and redirects HTTP to it.
+
+services:
+  proxy:
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTPS_PORT:-443}:8443"

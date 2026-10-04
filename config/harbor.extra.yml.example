@@ -1,0 +1,17 @@
+# Copy to config/harbor.extra.yml to append settings to the generated harbor.yml.
+# Only use top-level keys that scripts/setup.sh does not already write (see harbor.yml after
+# `make setup`); upstream/harbor.yml.tmpl documents every option. The scripts expect the
+# bundled database and redis, so do not use external_database / external_redis here.
+
+# Registry blobs in S3-compatible storage (e.g. MinIO) instead of DATA_DIR/registry.
+# BACKUP_REGISTRY then has no effect; back up the bucket separately.
+# storage_service:
+#   s3:
+#     accesskey: harbor
+#     secretkey: change-me
+#     region: us-east-1
+#     regionendpoint: https://minio.example.com
+#     bucket: harbor
+#     secure: true
+#   redirect:
+#     disable: true

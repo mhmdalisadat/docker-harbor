@@ -1,0 +1,95 @@
+# Lint on every push; deploy/status/backup are manual jobs on the default branch.
+# The server keeps its own .env (secrets), data/ and generated files; the deploy job only syncs
+# the code and runs a script there. Create .env on the server once before the first deploy.
+#
+# Settings -> CI/CD -> Variables:
+#   SSH_PRIVATE_KEY   (masked) private key allowed to log in as DEPLOY_USER
+#   SSH_KNOWN_HOSTS   output of `ssh-keyscan -p <port> <host>` (recommended)
+#   DEPLOY_HOST       server address
+#   DEPLOY_PORT       SSH port (default 22)
+#   DEPLOY_USER       default root; any other user needs passwordless sudo
+#   DEPLOY_PATH       default /opt/harbor
+
+stages:
+  - lint
+  - deploy
+
+variables:
+  DEPLOY_PORT: "22"
+  DEPLOY_USER: root
+  DEPLOY_PATH: /opt/harbor
+
+lint:
+  stage: lint
+  image: koalaman/shellcheck-alpine:stable
+  script:
+    - |
+      if command -v shellcheck >/dev/null; then
+        shellcheck -x scripts/*.sh
+      else
+        docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable -x scripts/*.sh
+      fi
+
+.remote:
+  stage: deploy
+  image: alpine:3.22
+  resource_group: harbor-production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      allow_failure: true
+  before_script:
+    - |
+      set -e
+      if ! command -v ssh >/dev/null || ! command -v rsync >/dev/null; then
+        if command -v apk >/dev/null; then apk add --no-cache openssh-client rsync
+        else sudo apt-get install -y -qq openssh-client rsync; fi
+      fi
+      [ -n "${DEPLOY_HOST:-}" ] || { echo "DEPLOY_HOST is not set"; exit 1; }
+      [ -n "${SSH_PRIVATE_KEY:-}" ] || { echo "SSH_PRIVATE_KEY is not set"; exit 1; }
+      eval "$(ssh-agent -s)"
+      printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+      install -d -m 700 ~/.ssh
+      if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      else
+        echo "WARNING: SSH_KNOWN_HOSTS not set, trusting the host key on first use"
+        ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" > ~/.ssh/known_hosts
+      fi
+      cat > ~/.ssh/config <<EOF
+      Host target
+        HostName $DEPLOY_HOST
+        Port $DEPLOY_PORT
+        User $DEPLOY_USER
+        StrictHostKeyChecking yes
+        ServerAliveInterval 30
+      EOF
+      chmod 600 ~/.ssh/config
+      # Runs scripts/<args> in DEPLOY_PATH as root.
+      remote() {
+        ssh target "cd '$DEPLOY_PATH' && test -f .env || { echo 'No .env on the server: run make init there and edit it first' >&2; exit 1; }
+          if [ \"\$(id -u)\" = 0 ]; then bash scripts/$*; else sudo -n bash scripts/$*; fi"
+      }
+
+harbor_deploy:
+  extends: .remote
+  script:
+    - ssh target "mkdir -p '$DEPLOY_PATH'"
+    - >
+      rsync -az --delete
+      --include=/.env.example --exclude=/.env --exclude='/.env.*'
+      --exclude=/data/ --exclude=/logs/ --exclude=/backups/ --exclude=/.git/
+      --exclude=/harbor.yml --exclude=/docker-compose.yml --exclude=/common/ --exclude=/input/
+      --exclude=/.prepared --exclude=/.recreate
+      ./ "target:$DEPLOY_PATH/"
+    - remote deploy.sh
+
+harbor_status:
+  extends: .remote
+  script:
+    - remote healthcheck.sh 60
+
+harbor_backup:
+  extends: .remote
+  script:
+    - remote backup.sh

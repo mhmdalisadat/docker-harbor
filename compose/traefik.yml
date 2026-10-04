@@ -1,0 +1,25 @@
+# PROXY_MODE=traefik: an existing Traefik terminates TLS and forwards everything (UI, /api,
+# /v2, /service, /c) to Harbor's nginx, which routes internally. No ports are published.
+#
+# The labels are read by a Traefik with the docker provider. A Traefik that only uses the swarm
+# provider ignores container labels; give it the file-provider route from `make traefik-config`.
+
+services:
+  proxy:
+    networks:
+      harbor:
+      traefik:
+        aliases:
+          - ${TRAEFIK_ALIAS:-harbor-proxy}
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:-traefik-net}
+      traefik.http.routers.harbor.rule: Host(`${HARBOR_HOSTNAME:?HARBOR_HOSTNAME is required}`)
+      traefik.http.routers.harbor.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.harbor.tls: "true"
+      traefik.http.services.harbor.loadbalancer.server.port: "8080"
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik-net}
+    external: true

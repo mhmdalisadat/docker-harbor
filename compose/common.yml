@@ -1,0 +1,29 @@
+# Applied on top of the generated docker-compose.yml in every mode. `!reset` needs Docker
+# Compose >= 2.24.
+#
+# - The generated fixed container names (redis, registry, nginx, ...) collide with other
+#   containers on a shared host; the components reach each other by service name, so the
+#   containers become harbor-<service>-1 instead.
+# - The proxy's published ports are dropped here and re-added explicitly by standalone*.yml /
+#   metrics.yml, so bind addresses are under our control.
+
+services:
+  log:
+    container_name: !reset null
+  registry:
+    container_name: !reset null
+  registryctl:
+    container_name: !reset null
+  postgresql:
+    container_name: !reset null
+  core:
+    container_name: !reset null
+  portal:
+    container_name: !reset null
+  jobservice:
+    container_name: !reset null
+  redis:
+    container_name: !reset null
+  proxy:
+    container_name: !reset null
+    ports: !reset []

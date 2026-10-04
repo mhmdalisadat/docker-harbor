@@ -1,0 +1,5 @@
+# ENABLE_TRIVY=1 (see common.yml for why the container name is reset).
+
+services:
+  trivy-adapter:
+    container_name: !reset null

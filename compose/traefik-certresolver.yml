@@ -1,0 +1,6 @@
+# PROXY_MODE=traefik with TRAEFIK_CERTRESOLVER set.
+
+services:
+  proxy:
+    labels:
+      traefik.http.routers.harbor.tls.certresolver: ${TRAEFIK_CERTRESOLVER}

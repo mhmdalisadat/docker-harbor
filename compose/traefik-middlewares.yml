@@ -1,0 +1,7 @@
+# PROXY_MODE=traefik with TRAEFIK_MIDDLEWARES set. Do not add buffering or body-size limits:
+# image layers can be several GB.
+
+services:
+  proxy:
+    labels:
+      traefik.http.routers.harbor.middlewares: ${TRAEFIK_MIDDLEWARES}

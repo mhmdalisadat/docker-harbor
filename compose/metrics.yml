@@ -1,0 +1,9 @@
+# ENABLE_METRICS=1: Prometheus endpoint http://METRICS_BIND:METRICS_PORT/metrics
+# (?comp=core|jobservice|registry for the component metrics).
+
+services:
+  proxy:
+    ports:
+      - "${METRICS_BIND:-127.0.0.1}:${METRICS_PORT:-9090}:9090"
+  exporter:
+    container_name: !reset null
